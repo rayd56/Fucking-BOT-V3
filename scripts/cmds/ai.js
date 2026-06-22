@@ -20,10 +20,10 @@ const downloadFile = async (url, ext) => {
   return filePath;
 };
 
-// Banner stylé Rayd Efoua
+// Banner Rayd Efoua
 const BANNER = `
 ╭─⦗ 🤖 Rayd Efoua AI ⦘─╮
-│ Version 4.0 | Premium
+│ Version 4.1 | Premium
 ╰────────────────────╯
 `;
 
@@ -31,24 +31,23 @@ const resetConversation = async (api, event, message) => {
   api.setMessageReaction("🌌", event.messageID, () => {}, true);
   try {
     await axios.delete(`${CLEAR_ENDPOINT}/${event.senderID}`);
-    const msg = `${BANNER}\n✅ Mémoire effacée avec succès\n💬 On repart à zéro, pose ta question!`;
-    return message.reply(msg);
-  } catch (error) {
+    return message.reply(`${BANNER}\n✅ Mémoire effacée\n💬 On repart à zéro!`);
+  } catch {
     api.setMessageReaction("❌", event.messageID, () => {}, true);
-    return message.reply(`${BANNER}\n❌ Erreur reset. Rayd Efoua est désolé`);
+    return message.reply(`${BANNER}\n❌ Erreur reset`);
   }
 };
 
 const handleEdit = async (api, event, message, args) => {
   const prompt = args.join(" ");
-  if (!prompt) return message.reply(`${BANNER}\n❗ Décris ce que tu veux générer/éditer\nEx: ai edit un chat cyberpunk`);
+  if (!prompt) return message.reply(`${BANNER}\n❗ Usage: ai edit <prompt>\nEx: ai edit un chat cyberpunk`);
 
   api.setMessageReaction("🎨", event.messageID, () => {}, true);
   try {
     const params = { prompt };
     if (event.messageReply?.attachments?.[0]?.url) {
       params.imgurl = event.messageReply.attachments[0].url;
-      await message.reply(`${BANNER}\n🖼️ Image détectée... Rayd Efoua modifie ça`);
+      await message.reply(`${BANNER}\n🖼️ Image détectée... Modification en cours`);
     } else {
       await message.reply(`${BANNER}\n✨ Génération en cours...`);
     }
@@ -62,13 +61,13 @@ const handleEdit = async (api, event, message, args) => {
 
     api.setMessageReaction("✅", event.messageID, () => {}, true);
     await message.reply({
-      body: `${BANNER}\n🎨 Voilà ton image par Rayd Efoua!\nPrompt: ${prompt}`,
+      body: `${BANNER}\n🎨 Voilà ton image!\nPrompt: ${prompt}`,
       attachment: fs.createReadStream(imagePath)
     });
     fs.unlinkSync(imagePath);
-  } catch (error) {
+  } catch {
     api.setMessageReaction("❌", event.messageID, () => {}, true);
-    message.reply(`${BANNER}\n⚠️ L'atelier de Rayd Efoua a bugué. Réessaie`);
+    message.reply(`${BANNER}\n⚠️ L'atelier a bugué. Réessaie`);
   }
 };
 
@@ -81,14 +80,14 @@ const handleYouTube = async (api, event, message, args) => {
   const query = args.slice(1).join(" ");
   if (!query) return message.reply(`${BANNER}\n❗ Donne-moi un titre ou lien YouTube`);
 
-  await message.reply(`${BANNER}\n🔍 Rayd Efoua cherche "${query}"...`);
+  await message.reply(`${BANNER}\n🔍 Recherche "${query}"...`);
 
   const sendFile = async (url, type) => {
     try {
       const { data } = await axios.get(`${YT_API}?url=${encodeURIComponent(url)}&type=${type}`);
-      if (!data.status ||!data.download_url) throw new Error("API failed");
+      if (!data.status || !data.download_url) throw new Error("API failed");
       
-      await message.reply(`${BANNER}\n⬇️ Téléchargement ${type === 'mp4'? 'vidéo' : 'audio'} en cours...`);
+      await message.reply(`${BANNER}\n⬇️ Téléchargement ${type === 'mp4'? 'vidéo' : 'audio'}...`);
       const filePath = await downloadFile(data.download_url, type);
       
       await message.reply({
@@ -97,7 +96,7 @@ const handleYouTube = async (api, event, message, args) => {
       });
       fs.unlinkSync(filePath);
     } catch {
-      message.reply(`${BANNER}\n❌ Échec download. Lien mort?`);
+      message.reply(`${BANNER}\n❌ Échec download`);
     }
   };
 
@@ -105,13 +104,13 @@ const handleYouTube = async (api, event, message, args) => {
 
   try {
     const results = (await ytSearch(query)).videos.slice(0, 6);
-    if (results.length === 0) return message.reply(`${BANNER}\n❌ Aucun résultat trouvé`);
+    if (results.length === 0) return message.reply(`${BANNER}\n❌ Aucun résultat`);
 
     let list = `╭─⦗ Résultats YouTube ⦘─╮\n`;
     results.forEach((v, i) => {
       list += `│ ${i + 1}. ${v.title.slice(0,35)}...\n│ ⏱️ ${v.timestamp} | 👁️ ${v.views}\n├───────────────\n`;
     });
-    list += `╰─ Réponds 1-6 pour télécharger ─╯\n\n🤖 Par Rayd Efoua`;
+    list += `╰─ Réponds 1-6 ─╯\n\n🤖 Rayd Efoua`;
 
     const thumbs = await Promise.all(
       results.map(v => axios.get(v.thumbnail, { responseType: "stream" }).then(res => res.data))
@@ -152,25 +151,25 @@ const handleAIRequest = async (api, event, userInput, message) => {
   if (urlMatch && validUrl.isWebUri(urlMatch)) {
     imageUrl = urlMatch;
     messageContent = messageContent.replace(urlMatch, '').trim();
-    await message.reply(`${BANNER}\n🖼️ Image analysée par Rayd Efoua...`);
+    await message.reply(`${BANNER}\n🖼️ Image analysée...`);
   } else {
-    await message.reply(`${BANNER}\n💭 Rayd Efoua réfléchit...`);
+    await message.reply(`${BANNER}\n💭 Réflexion en cours...`);
   }
 
-  if (!messageContent &&!imageUrl) {
+  if (!messageContent && !imageUrl) {
     api.setMessageReaction("❌", event.messageID, () => {}, true);
-    return message.reply(`${BANNER}\n💬 Pose ta question après "ai"\nEx: ai c'est quoi l'IA`);
+    return message.reply(`${BANNER}\n💬 Pose ta question après "ai"`);
   }
 
   try {
     const response = await axios.post(API_ENDPOINT, { uid: userId, message: messageContent, image_url: imageUrl });
-    let finalReply = response.data.reply || '✅ Réponse de Rayd Efoua';
+    let finalReply = response.data.reply || '✅ Réponse Rayd Efoua';
 
     finalReply = finalReply
-     .replace(/🎀\s*𝗦𝗵𝗶𝘇𝘂/gi, '🤖 Rayd Efoua')
-     .replace(/Shizu/gi, 'Rayd Efoua')
-     .replace(/Christuska/gi, 'Rayd Efoua')
-     .replace(/Aryan Chauhan/gi, 'Rayd Efoua');
+      .replace(/🎀\s*𝗦𝗵𝗶𝘇𝘂/gi, '🤖 Rayd Efoua')
+      .replace(/Shizu/gi, 'Rayd Efoua')
+      .replace(/Christuska/gi, 'Rayd Efoua')
+      .replace(/Aryan Chauhan/gi, 'Rayd Efoua');
 
     const attachments = [];
     if (response.data.image_url) {
@@ -179,7 +178,7 @@ const handleAIRequest = async (api, event, userInput, message) => {
 
     const sentMessage = await message.reply({
       body: `${BANNER}\n${finalReply}\n\n╰─ Propulsé par Rayd Efoua ─╯`,
-      attachment: attachments.length > 0? attachments : undefined
+      attachment: attachments.length > 0 ? attachments : undefined
     });
 
     global.GoatBot.onReply.set(sentMessage.messageID, {
@@ -190,24 +189,24 @@ const handleAIRequest = async (api, event, userInput, message) => {
     api.setMessageReaction("✨", event.messageID, () => {}, true);
   } catch (error) {
     api.setMessageReaction("💥", event.messageID, () => {}, true);
-    message.reply(`${BANNER}\n⚠️ Rayd Efoua a crashé\nErreur: ${error.message.slice(0,100)}`);
+    message.reply(`${BANNER}\n⚠️ Crash Rayd Efoua\nErreur: ${error.message.slice(0,100)}`);
   }
 };
 
 module.exports = {
   config: {
     name: 'ai',
-    version: '4.0.0',
+    version: '4.1.0',
     author: 'Rayd Efoua',
     role: 0,
     category: '🤖 AI Premium',
-    shortDescription: 'Assistant IA stylé par Rayd Efoua',
-    longDescription: 'Chat IA, Génération/Edit d\'images, Download YouTube MP3/MP4',
+    shortDescription: 'Assistant IA Rayd Efoua',
+    longDescription: 'Chat IA + Edit image + Download YouTube',
     guide: {
-      en: `ai [question] → Chat avec Rayd Efoua
-ai edit [prompt] → Génère/édite une image
-ai youtube -v [titre] → Download vidéo
-ai youtube -a [titre] → Download audio MP3
+      en: `ai [question] → Chat
+ai edit [prompt] → Génère/édite image
+ai youtube -v [titre] → Vidéo MP4
+ai youtube -a [titre] → Audio MP3
 ai clear → Reset mémoire`
     }
   },
@@ -215,10 +214,10 @@ ai clear → Reset mémoire`
   onStart: async function ({ api, event, args, message }) {
     const userInput = args.join(' ').trim();
     if (!userInput) {
-      return message.reply(`${BANNER}\n👋 Salut! Je suis Rayd Efoua AI\nTape "ai" + ta question pour commencer\nTape "ai help" pour voir toutes les commandes`);
+      return message.reply(`${BANNER}\n👋 Salut! Rayd Efoua AI\nTape "ai" + ta question\nTape "ai help" pour commandes`);
     }
     if (userInput.toLowerCase() === 'help') {
-      return message.reply(`${BANNER}\n📚 COMMANDES RAYD EFOUA AI:\n\n1. ai salut → Chat normal\n2. ai edit un robot bleu → Génère image\n3. ai edit (réponds à une image) → Modifie l'image\n4. ai youtube -a Kamin → MP3\n5. ai youtube -v Lofi → MP4\n6. ai clear → Reset\n╰─ Made by Rayd Efoua ─╯`);
+      return message.reply(`${BANNER}\n📚 COMMANDES:\n\n1. ai salut → Chat\n2. ai edit un robot bleu → Génère\n3. ai edit (réponds à image) → Modifie\n4. ai youtube -a Kamin → MP3\n5. ai youtube -v Lofi → MP4\n6. ai clear → Reset\n╰─ Rayd Efoua ─╯`);
     }
     if (['clear', 'reset'].includes(userInput.toLowerCase())) {
       return await resetConversation(api, event, message);
@@ -227,7 +226,7 @@ ai clear → Reset mémoire`
   },
 
   onReply: async function ({ api, event, Reply, message }) {
-    if (event.senderID!== Reply.author) return;
+    if (event.senderID !== Reply.author) return;
     const userInput = event.body?.trim();
     if (!userInput) return;
     if (['clear', 'reset'].includes(userInput.toLowerCase())) {
@@ -237,9 +236,9 @@ ai clear → Reset mémoire`
       const idx = parseInt(userInput);
       const list = Reply.results;
       if (isNaN(idx) || idx < 1 || idx > list.length)
-        return message.reply(`${BANNER}\n❌ Choix invalide. Tape 1-6`);
+        return message.reply(`${BANNER}\n❌ Choix invalide. 1-6`);
       
-      await message.reply(`${BANNER}\n⬇️ Rayd Efoua prépare ton fichier...`);
+      await message.reply(`${BANNER}\n⬇️ Préparation du fichier...`);
       const selected = list[idx - 1];
       const type = Reply.type === "-v"? "mp4" : "mp3";
       const fileUrl = `${YT_API}?url=${encodeURIComponent(selected.url)}&type=${type}`;
@@ -252,18 +251,10 @@ ai clear → Reset mémoire`
         });
         fs.unlinkSync(filePath);
       } catch {
-        message.reply(`${BANNER}\n❌ Download failed. Rayd Efoua`);
+        message.reply(`${BANNER}\n❌ Download failed`);
       }
     } else {
       return await handleAIRequest(api, event, userInput, message);
     }
-  },
-
-  onChat: async function ({ api, event, message }) {
-    const body = event.body?.trim();
-    if (!body?.toLowerCase().startsWith('ai ')) return;
-    const userInput = body.slice(3).trim();
-    if (!userInput) return;
-    return await handleAIRequest(api, event, userInput, message);
   }
 };

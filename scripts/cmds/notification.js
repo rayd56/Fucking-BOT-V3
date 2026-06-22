@@ -1,191 +1,208 @@
-const { getStreamsFromAttachment } = global.utils;
+const { createCanvas } = require('canvas');
+const fs = require('fs-extra');
+const path = require('path');
+const { config } = global.GoatBot;
 
+function fancyText(text) {
+  return global.utils?.toGlobalFontStyle ? global.utils.toGlobalFontStyle(text) : text;
+}
+
+// --- FONCTION DE GÉNÉRATION DE CANVAS STYLE LUXURY DIFFUSION ---
+async function generateNotiCanvas(adminName, messageContent, totalGroups) {
+    const width = 1000; 
+    const height = 450; 
+    const padding = 65;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    // 1. Fond Minimaliste Luxury
+    const gradient = ctx.createRadialGradient(width / 2, height / 2, 50, width / 2, height / 2, width * 0.6);
+    gradient.addColorStop(0, '#121214');
+    gradient.addColorStop(1, '#080809');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
+
+    // 2. Bordure Fine Or Satiné
+    const goldGrad = ctx.createLinearGradient(0, 0, width, height);
+    goldGrad.addColorStop(0, '#d4af37');
+    goldGrad.addColorStop(0.5, '#f3e5ab');
+    goldGrad.addColorStop(1, '#aa7c11');
+    
+    ctx.strokeStyle = goldGrad;
+    ctx.lineWidth = 1.5; 
+    ctx.strokeRect(25, 25, width - 50, height - 50);
+
+    // 3. En-tête Épuré
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '300 24px sans-serif'; 
+    ctx.fillText("COMMUNIQUE OFFICIEL", padding, 85);
+
+    ctx.fillStyle = '#d4af37'; 
+    ctx.font = '600 13px monospace'; 
+    ctx.letterSpacing = "2px"; 
+    ctx.fillText(`EMIS PAR : ${adminName.toUpperCase()}  •  CANAL : ${totalGroups} DIRECTS`, padding, 115);
+
+    // Ligne de séparation
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padding, 135);
+    ctx.lineTo(width - padding, 135);
+    ctx.stroke();
+
+    // 4. Zone d'affichage du message
+    const boxY = 175;
+    const boxW = width - (padding * 2);
+    const boxH = 180;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.01)';
+    ctx.beginPath();
+    ctx.roundRect(padding, boxY, boxW, boxH, 8);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 36px sans-serif'; 
+    
+    const words = messageContent.split(' ');
+    let line = '';
+    let y = boxY + 70;
+    const maxLineWidth = boxW - 40;
+
+    for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let metrics = ctx.measureText(testLine);
+        if (metrics.width > maxLineWidth && n > 0) {
+            ctx.fillText(line, padding + 20, y);
+            line = words[n] + ' ';
+            y += 50; 
+        } else {
+            line = testLine;
+        }
+    }
+    ctx.fillText(line, padding + 20, y);
+
+    // 5. Footer Signature Premium
+    ctx.textAlign = 'center';
+    ctx.font = '11px monospace'; 
+    ctx.fillStyle = '#4a4a4e';
+    ctx.fillText(`DISTRIBUTED SECURELY VIA RAYD EXECUTIVE NETWORK`, width / 2, height - 45);
+
+    const dirCache = global.client?.dirCache || path.join(__dirname, "cache");
+    await fs.ensureDir(dirCache);
+    const imagePath = path.join(dirCache, `noti_chic_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
+    await fs.promises.writeFile(imagePath, canvas.toBuffer('image/png'));
+    return imagePath;
+}
+
+// --- MODULE PRINCIPAL ---
 module.exports = {
   config: {
-    name: "notification",
-    aliases: ["notify"],
-    version: "0.0.7",
-    author: "NTKhang | Azadx69x",
-    countDown: 5,
-    role: 2,
-    description: {
-      en: "📢 𝐍𝐨𝐭𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧 𝐭𝐨 𝐀𝐥𝐥 𝐆𝐫𝐨𝐮𝐩𝐬"
-    },
-    category: "Admin",
-    guide: {
-      en: "{pn} <𝐦𝐞𝐬𝐬𝐚𝐠𝐞>\n𝐑𝐞𝐩𝐥𝐲 𝐰𝐢𝐭𝐡 𝐚𝐭𝐭𝐚𝐜𝐡𝐦𝐞𝐧𝐭𝐬 𝐭𝐨 𝐢𝐧𝐜𝐥𝐮𝐝𝐞 𝐦𝐞𝐝𝐢𝐚\n𝐄𝐱𝐚𝐦𝐩𝐥𝐞: {pn} 𝐒𝐞𝐫𝐯𝐞𝐫 𝐦𝐚𝐢𝐧𝐭𝐞𝐧𝐚𝐧𝐜𝐞 𝐭𝐨𝐧𝐢𝐠𝐡𝐭!"
-    },
-    envConfig: {
-      delayPerGroup: 250,
-      enableConfirmation: true
-    },
-    adminBot: [
-      "61585772322631","61588403646276"
-    ]
+    name: "noti",
+    aliases: ["notification", "broadcast", "bc"],
+    version: "1.1.5",
+    author: "rayd",
+    countDown: 10,
+    role: 2, 
+    shortDescription: { en: "Send a notification luxury image + text to all groups" },
+    longDescription: { en: "Broadcasts an administrative announcement inside a highly customizable professional canvas." },
+    category: "owner",
+    guide: { en: "{pn} [votre message]" }
   },
 
-  langs: {
-    en: {
-      missingMessage: "⚠️ 𝐏𝐥𝐞𝐚𝐬𝐞 𝐞𝐧𝐭𝐞𝐫 𝐚 𝐦𝐞𝐬𝐬𝐚𝐠𝐞 𝐭𝐨 𝐬𝐞𝐧𝐝",
-      sendingNotification: "📤 𝐒𝐞𝐧𝐝𝐢𝐧𝐠 𝐭𝐨 %1 𝐠𝐫𝐨𝐮𝐩𝐬...",
-      confirmSend: "⚠️ 𝐒𝐞𝐧𝐝 𝐭𝐨 %1 𝐠𝐫𝐨𝐮𝐩𝐬?\n𝐑𝐞𝐩𝐥𝐲: yes | no",
-      cancelled: "❌ 𝐂𝐚𝐧𝐜𝐞𝐥𝐥𝐞𝐝",
-      processing: "⏳ 𝐒𝐞𝐧𝐝𝐢𝐧𝐠...",
-      noGroups: "❌ 𝐍𝐨 𝐚𝐜𝐭𝐢𝐯𝐞 𝐠𝐫𝐨𝐮𝐩𝐬 𝐟𝐨𝐮𝐧𝐝",
-      notAdminBot: "⛔ 𝐀𝐝𝐦𝐢𝐧 𝐚𝐜𝐜𝐞𝐬𝐬 𝐫𝐞𝐪𝐮𝐢𝐫𝐞𝐝",
-      invalidReply: "⚠️ 𝐑𝐞𝐩𝐥𝐲 'yes' 𝐨𝐫 'no'",
-      sendSuccess: "✅ 𝐍𝐨𝐭𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧 𝐬𝐞𝐧𝐭!\n\n📊 𝐒𝐭𝐚𝐭𝐬:\n• 𝐓𝐨𝐭𝐚𝐥: %1\n• 𝐒𝐮𝐜𝐜𝐞𝐬𝐬: %2\n• 𝐅𝐚𝐢𝐥𝐞𝐝: %3\n⏱️ 𝐓𝐢𝐦𝐞: %4"
+  onStart: async function ({ message, event, args, usersData, threadsData, api }) {
+    const devArray = config.developer || config.devUsers || config.developers || [];
+    
+    if (!devArray.includes(event.senderID.toString())) {
+      return message.reply(fancyText("✕ Accès refusé : Connexion sécurisée requise."));
     }
-  },
 
-  onStart: async function ({ message, api, event, args, commandName, envCommands, threadsData, getLang }) {
+    const content = args.join(" ");
+    if (!content) {
+        return message.reply(fancyText("✨ Veuillez saisir la note à diffuser globalement."));
+    }
+
+    let senderName = "Administrateur";
     try {
-      if (!(this.config.adminBot || []).includes(event.senderID)) {
-        return message.reply(getLang("notAdminBot"));
-      }
+        if (usersData && event.senderID) {
+            senderName = await usersData.getName(event.senderID) || "Administrateur";
+        }
+    } catch (e) {}
 
-      if (!args[0]) return message.reply(getLang("missingMessage"));
+    // --- STRATÉGIE DE RÉCUPÉRATION COMPLÈTE DES GROUPES ---
+    let allThreadIDs = [];
+    try {
+        // Méthode 1 : Récupération depuis la base de données du bot (le plus fiable sur GoatBot)
+        if (threadsData && typeof threadsData.getAll === 'function') {
+            const allThreadsRaw = await threadsData.getAll() || [];
+            allThreadIDs = allThreadsRaw
+                .filter(t => t && t.threadID && t.isGroup !== false)
+                .map(t => t.threadID.toString());
+        }
+    } catch (e) {
+        console.error("Échec de la récupération via threadsData, tentative via API...", e);
+    }
 
-      const botID = api.getCurrentUserID();
+    // Méthode de secours 2 : Si la BDD est vide, on force l'API Facebook à fouiller l'inbox
+    if (allThreadIDs.length === 0) {
+        try {
+            const inbox = await api.getThreadList(500, null, ["INBOX", "OTHER"]) || [];
+            allThreadIDs = inbox
+                .filter(thread => thread.isGroup === true || thread.isSubscribed === true)
+                .map(thread => thread.threadID.toString());
+        } catch (err) {
+            console.error("Erreur via api.getThreadList:", err);
+        }
+    }
 
-      let allThreads = (await threadsData.getAll()).filter(
-        t => t.isGroup && t.members?.find(m => m.userID == botID)?.inGroup
-      );
+    // Supprimer les doublons et s'assurer qu'on n'inclut pas des chaînes vides
+    allThreadIDs = [...new Set(allThreadIDs)].filter(id => id && id !== "");
 
-      if (allThreads.length === 0) return message.reply(getLang("noGroups"));
+    if (allThreadIDs.length === 0) {
+        return message.reply("❌ Aucun groupe n'a pu être détecté dans la base de données.");
+    }
 
-      const delayPerGroup = envCommands[commandName]?.delayPerGroup || 300;
-      const enableConfirmation = envCommands[commandName]?.enableConfirmation !== false;
+    let canvasPath = null;
+    let successCount = 0;
 
-      if (enableConfirmation && allThreads.length > 3) {
-        const confirmation = await message.reply(getLang("confirmSend", allThreads.length));
-        global.GoatBot.onReply.set(confirmation.messageID, {
-          commandName,
-          messageID: confirmation.messageID,
-          author: event.senderID,
-          allThreads,
-          args,
-          attachments: event.attachments || [],
-          messageReply: event.messageReply,
-          delayPerGroup
+    try {
+        canvasPath = await generateNotiCanvas(senderName, content, allThreadIDs.length);
+
+        // Message initial à l'exécuteur
+        await message.reply({
+            body: `⚜️ **Transmission du communiqué en cours...**\nAlignement sur ${allThreadIDs.length} canaux réseau détectés.`,
+            attachment: fs.createReadStream(canvasPath)
         });
-        return;
-      }
 
-      const loadingMsg = await message.reply(getLang("sendingNotification", allThreads.length));
+        // Envoi en boucle à TOUS les IDs trouvés
+        for (const threadID of allThreadIDs) {
+            try {
+                await api.sendMessage({
+                    body: `✨ **COMMUNIQUÉ DE L'ADMINISTRATION**\n\n${content}`,
+                    attachment: fs.createReadStream(canvasPath)
+                }, threadID);
+                successCount++;
+                
+                // Pause de sécurité pour éviter le bannissement Facebook (1.2 seconde)
+                await new Promise(resolve => setTimeout(resolve, 1200));
+            } catch (error) {
+                console.error(`Échec d'envoi pour le thread ${threadID}:`, error.message);
+            }
+        }
 
-      await executeNotification(message, api, event, args, allThreads, delayPerGroup, getLang, loadingMsg);
+        return await message.reply(`✅ **Rapport final disponible**\nTransmissions validées : ${successCount}/${allThreadIDs.length} groupes.`);
 
-    } catch (error) {
-      console.error("𝐍𝐨𝐭𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧 𝐄𝐫𝐫𝐨𝐫:", error);
-      await message.reply(`❌ 𝐄𝐫𝐫𝐨𝐫: ${error.message}`);
-    }
-  },
-
-  onReply: async function ({ message, Reply, event, api, getLang }) {
-    try {
-      if (event.senderID !== Reply.author) return;
-
-      const { allThreads, args, attachments, messageReply, delayPerGroup } = Reply;
-      const response = event.body?.toLowerCase()?.trim();
-
-      if (response === "yes" || response === "y") {
-        const processingMsg = await message.reply(getLang("processing"));
-        await api.unsendMessage(Reply.messageID);
-
-        await executeNotification(message, api, event, args, allThreads, delayPerGroup, getLang, processingMsg);
-        global.GoatBot.onReply.delete(Reply.messageID);
-      } else if (response === "no" || response === "n" || response === "cancel") {
-        await message.reply(getLang("cancelled"));
-        global.GoatBot.onReply.delete(Reply.messageID);
-      } else {
-        await message.reply(getLang("invalidReply"));
-      }
-    } catch (error) {
-      console.error("𝐑𝐞𝐩𝐥𝐲 𝐡𝐚𝐧𝐝𝐥𝐞𝐫 𝐞𝐫𝐫𝐨𝐫:", error);
+    } catch (globalError) {
+        console.error("Erreur critique noti:", globalError);
+        return message.reply(`❌ Erreur technique : ${globalError.message}`);
+    } finally {
+        if (canvasPath && fs.existsSync(canvasPath)) {
+            try {
+                await fs.unlink(canvasPath);
+            } catch (err) {
+                console.error("Erreur nettoyage cache:", err);
+            }
+        }
     }
   }
 };
-
-function getBangladeshTime() {
-  const now = new Date();
-  const options = {
-    timeZone: 'Asia/Dhaka',
-    day: 'numeric',
-    month: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  };
-  return now.toLocaleString('en-GB', options);
-}
-
-async function executeNotification(message, api, event, args, allThreads, delayPerGroup, getLang, loadingMsg) {
-  const startTime = Date.now();
-
-  try {
-    let attachmentsStream = [];
-    try {
-      const allAttachments = [
-        ...(event.attachments || []),
-        ...(event.messageReply?.attachments || [])
-      ].filter(item => item && ["photo", "png", "animated_image", "video", "audio", "sticker", "file"].includes(item.type));
-
-      if (allAttachments.length > 0) {
-        attachmentsStream = await getStreamsFromAttachment(allAttachments);
-      }
-    } catch (err) {
-      console.error("𝐀𝐭𝐭𝐚𝐜𝐡𝐦𝐞𝐧𝐭 𝐞𝐫𝐫𝐨𝐫:", err);
-    }
-
-    const messageBody = args.join(" ");
-    let sendSuccess = 0;
-    let sendFailed = 0;
-
-    for (const [index, thread] of allThreads.entries()) {
-      const threadID = thread.threadID;
-      const groupName = thread.threadName || "𝐔𝐧𝐤𝐧𝐨𝐰𝐧";
-
-      try {
-        const announcement = `┏━━━━━━━━━━━━━━━━━┓\n    📢  𝐀𝐃𝐌𝐈𝐍 𝐍𝐎𝐓𝐈𝐂𝐄  \n┗━━━━━━━━━━━━━━━━━┛\n\n💬 𝐌𝐞𝐬𝐬𝐚𝐠𝐞:\n${messageBody}\n\n📍 𝐆𝐫𝐨𝐮𝐩: ${groupName}\n👥 𝐌𝐞𝐦𝐛𝐞𝐫𝐬: ${thread.members?.length || 'N/A'}\n━━━━━━━━━━━━━━━━━━\n🤖 𝐒𝐞𝐧𝐭 𝐛𝐲: 𝐀𝐳𝐚𝐝𝐱𝟔𝟗𝐱\n🕐 ${getBangladeshTime()}`;
-
-        await api.sendMessage({
-          body: announcement,
-          attachment: attachmentsStream
-        }, threadID);
-
-        sendSuccess++;
-        console.log(`✅ ${groupName}`);
-
-        if (index < allThreads.length - 1) {
-          await new Promise(r => setTimeout(r, delayPerGroup));
-        }
-
-      } catch (error) {
-        console.error(`❌ ${groupName}:`, error);
-        sendFailed++;
-      }
-    }
-
-    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-
-    const result = getLang("sendSuccess", allThreads.length, sendSuccess, sendFailed, `${duration}s`);
-
-    if (loadingMsg && loadingMsg.messageID) {
-      await api.unsendMessage(loadingMsg.messageID);
-    }
-
-    await message.reply(result);
-
-  } catch (error) {
-    console.error("𝐍𝐨𝐭𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧 𝐟𝐚𝐢𝐥𝐞𝐝:", error);
-
-    if (loadingMsg && loadingMsg.messageID) {
-      await api.unsendMessage(loadingMsg.messageID).catch(() => {});
-    }
-
-    await message.reply(`❌ 𝐍𝐨𝐭𝐢𝐟𝐢𝐜𝐚𝐭𝐢𝐨𝐧 𝐟𝐚𝐢𝐥𝐞𝐝: ${error.message}`);
-  }
-}

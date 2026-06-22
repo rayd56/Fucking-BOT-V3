@@ -160,10 +160,10 @@ async function generatePrefixCanvas(globalPrefix, threadPrefix, senderName) {
     ctx.fillStyle = hexToRgba(theme.text, 0.3);
     ctx.fillText(`SECURE PROTOCOL TRANSMISSION • RAYD SYSTEMS GROUP`, width / 2, height - 50);
 
-    // Enregistrement final dans le cache
-    const dirCache = global.client.dirCache || path.join(__dirname, "cache");
+    // Chemin sécurisé vers le dossier cache (local ou global)
+    const dirCache = global.client?.dirCache || path.join(__dirname, "cache");
     await fs.ensureDir(dirCache);
-    const imagePath = path.join(dirCache, `prefix_cyber_${Date.now()}.png`);
+    const imagePath = path.join(dirCache, `prefix_cyber_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
     await fs.promises.writeFile(imagePath, canvas.toBuffer('image/png'));
     return imagePath;
 }
@@ -173,7 +173,7 @@ module.exports = {
   config: {
     name: "prefix",
     aliases: ["prefixe"],
-    version: "2.1.0",
+    version: "2.1.1",
     author: "rayd",
     countDown: 5,
     role: 0,
@@ -187,25 +187,47 @@ module.exports = {
     const globalPrefix = config.prefix || "•";
     let threadPrefix = globalPrefix;
     let senderName = "Utilisateur";
+    let imagePath = null;
     
     try {
-        const threadData = await threadsData.get(event.threadID);
-        if (threadData && threadData.data && threadData.data.prefix) {
-            threadPrefix = threadData.data.prefix;
+        if (threadsData && event.threadID) {
+            const threadData = await threadsData.get(event.threadID);
+            if (threadData && threadData.data && threadData.data.prefix) {
+                threadPrefix = threadData.data.prefix;
+            }
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error("Erreur threadsData:", e);
+    }
 
     try {
-        senderName = await usersData.getName(event.senderID) || "Utilisateur";
-    } catch (e) {}
+        if (usersData && event.senderID) {
+            const name = await usersData.getName(event.senderID);
+            if (name) senderName = name;
+        }
+    } catch (e) {
+        console.error("Erreur usersData:", e);
+    }
 
-    const imagePath = await generatePrefixCanvas(globalPrefix, threadPrefix, senderName);
-    
-    await message.reply({
-      body: fancyText(`⚙️ **PREFIX CONFIGURATION**\n\nGlobal : ${globalPrefix}\nThis chat : ${threadPrefix}`),
-      attachment: fs.createReadStream(imagePath)
-    });
-    
-    return await fs.unlink(imagePath);
+    try {
+        imagePath = await generatePrefixCanvas(globalPrefix, threadPrefix, senderName);
+        
+        await message.reply({
+          body: fancyText(`⚙️ **PREFIX CONFIGURATION**\n\nGlobal : ${globalPrefix}\nThis chat : ${threadPrefix}`),
+          attachment: fs.createReadStream(imagePath)
+        });
+    } catch (error) {
+        console.error("Erreur de génération du préfixe:", error);
+        // Secours textuel au cas où le canvas échoue totalement pour un utilisateur
+        return message.reply(`⚙️ **PREFIX CONFIGURATION**\n\nGlobal : ${globalPrefix}\nThis chat : ${threadPrefix}`);
+    } finally {
+        if (imagePath && fs.existsSync(imagePath)) {
+            try {
+                await fs.unlink(imagePath);
+            } catch (err) {
+                console.error("Erreur suppression fichier:", err);
+            }
+        }
+    }
   }
 };

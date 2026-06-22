@@ -5,7 +5,7 @@
 <br/>
 
 <div align="center">
-  <img src="https://i.imgur.com/MaHxr85.jpeg" width="90%" style="border-radius:12px; border: 2px solid #00FFFF;"/>
+  <img src="https://i.imgur.com/zYIKAwK.jpeg" width="90%" style="border-radius:12px; border: 2px solid #00FFFF;"/>
 </div>
 
 <br/>

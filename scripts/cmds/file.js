@@ -97,10 +97,10 @@ async function generateFileCanvas(fileName, status, senderName) {
     ctx.fillStyle = '#4a4a52';
     ctx.fillText(`SECURE FILE TRANSMISSION • RAYD SYSTEMS PREMIUM`, width / 2, height - 40);
 
-    // Sauvegarde temporaire en cache
-    const dirCache = global.client.dirCache || path.join(__dirname, "cache");
+    // Sauvegarde temporaire en cache avec identifiant unique
+    const dirCache = global.client?.dirCache || path.join(__dirname, "cache");
     await fs.ensureDir(dirCache);
-    const imagePath = path.join(dirCache, `file_premium_${Date.now()}.png`);
+    const imagePath = path.join(dirCache, `file_premium_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
     await fs.promises.writeFile(imagePath, canvas.toBuffer('image/png'));
     return imagePath;
 }
@@ -110,7 +110,7 @@ module.exports = {
   config: {
     name: "file",
     aliases: ["src", "readfile"],
-    version: "1.3.0",
+    version: "1.3.1",
     author: "rayd",
     countDown: 5,
     role: 2, 
@@ -123,61 +123,97 @@ module.exports = {
   onStart: async function ({ message, event, args, usersData }) {
     const devArray = config.developer || config.devUsers || config.developers || [];
     
-    if (!devArray.includes(event.senderID)) {
+    // Vérification stricte des permissions dev
+    if (!devArray.includes(event.senderID.toString())) {
       return message.reply(fancyText("✕ Accès refusé : Ce protocole est strictement réservé à l'équipe de développement RAYD."));
     }
 
     let senderName = "Développeur";
     try {
-        senderName = await usersData.getName(event.senderID) || "Développeur";
+        if (usersData && event.senderID) {
+            senderName = await usersData.getName(event.senderID) || "Développeur";
+        }
     } catch (e) {}
 
     const commandName = args[0];
+    let canvasPath = null;
+
     if (!commandName) {
-        const errPath = await generateFileCanvas("None", "ERROR: MISSING ARG", senderName);
-        await message.reply({
-            body: fancyText("⚠️ Veuillez spécifier le nom d'une commande."),
-            attachment: fs.createReadStream(errPath)
-        });
-        return await fs.unlink(errPath);
+        try {
+            canvasPath = await generateFileCanvas("None", "ERROR: MISSING ARG", senderName);
+            await message.reply({
+                body: fancyText("⚠️ Veuillez spécifier le nom d'une commande (ex: file prefix)."),
+                attachment: fs.createReadStream(canvasPath)
+            });
+        } catch (err) {
+            await message.reply(fancyText("⚠️ Veuillez spécifier le nom d'une commande."));
+        } finally {
+            if (canvasPath && fs.existsSync(canvasPath)) await fs.unlink(canvasPath);
+        }
+        return;
     }
 
-    const commandsDir = path.join(__dirname, '..', 'cmds'); 
     const targetFileName = commandName.endsWith('.js') ? commandName : `${commandName}.js`;
-    let filePath = path.join(__dirname, targetFileName); 
+    
+    // Détermination dynamique des dossiers de scripts courants sous GoatBot
+    const pathsToSearch = [
+        path.join(__dirname, targetFileName),                             // Dossier actuel du script
+        path.join(__dirname, '..', 'cmds', targetFileName),               // Dossier parent/cmds
+        path.join(process.cwd(), 'scripts', 'cmds', targetFileName),      // Chemin standard Goatbot v2 racine
+        path.join(process.cwd(), 'modules', 'commands', targetFileName)   // Alternative structures
+    ];
 
-    if (!fs.existsSync(filePath)) {
-        filePath = path.join(commandsDir, targetFileName); 
+    let filePath = null;
+    for (const p of pathsToSearch) {
+        if (fs.existsSync(p)) {
+            filePath = p;
+            break;
+        }
     }
 
-    if (!fs.existsSync(filePath)) {
-        const failPath = await generateFileCanvas(targetFileName, "ERROR: NOT FOUND", senderName);
-        await message.reply({
-            body: fancyText(`❌ Impossible de localiser le fichier ${targetFileName} dans le dépôt.`),
-            attachment: fs.createReadStream(failPath)
-        });
-        return await fs.unlink(failPath);
+    if (!filePath) {
+        try {
+            canvasPath = await generateFileCanvas(targetFileName, "ERROR: NOT FOUND", senderName);
+            await message.reply({
+                body: fancyText(`❌ Impossible de localiser le fichier "${targetFileName}" dans les répertoires actifs.`),
+                attachment: fs.createReadStream(canvasPath)
+            });
+        } catch (err) {
+            await message.reply(fancyText(`❌ Impossible de localiser le fichier "${targetFileName}".`));
+        } finally {
+            if (canvasPath && fs.existsSync(canvasPath)) await fs.unlink(canvasPath);
+        }
+        return;
     }
 
     try {
         const fileContent = await fs.readFile(filePath, 'utf8');
-        const canvasPath = await generateFileCanvas(targetFileName, "SUCCESS: EXTRACTED", senderName);
+        canvasPath = await generateFileCanvas(targetFileName, "SUCCESS: EXTRACTED", senderName);
 
-        // On envoie l'image d'illustration ET le texte directement copiable en dessous
+        // Envoi de la réponse avec l'image générée et le code markdown copiable
         await message.reply({
             body: `📦 **Extraction réussie pour ${targetFileName}** :\n\n\`\`\`javascript\n${fileContent}\n\`\`\``,
             attachment: fs.createReadStream(canvasPath)
         });
 
-        return await fs.unlink(canvasPath);
-
     } catch (error) {
-        const errTrackPath = await generateFileCanvas(targetFileName, "ERROR: FAILED", senderName);
-        await message.reply({
-            body: fancyText(`⚠️ Une erreur est survenue lors de la lecture : ${error.message}`),
-            attachment: fs.createReadStream(errTrackPath)
-        });
-        return await fs.unlink(errTrackPath);
+        try {
+            canvasPath = await generateFileCanvas(targetFileName, "ERROR: FAILED", senderName);
+            await message.reply({
+                body: fancyText(`⚠️ Une erreur est survenue lors de la lecture : ${error.message}`),
+                attachment: fs.createReadStream(canvasPath)
+            });
+        } catch (err) {
+            await message.reply(fancyText(`⚠️ Une erreur est survenue lors de la lecture du code.`));
+        }
+    } finally {
+        if (canvasPath && fs.existsSync(canvasPath)) {
+            try {
+                await fs.unlink(canvasPath);
+            } catch (err) {
+                console.error("Erreur nettoyage fichier temporaire:", err);
+            }
+        }
     }
   }
 };

@@ -2,185 +2,159 @@ const axios = require("axios");
 const { getPrefix } = global.utils;
 const { commands, aliases } = global.GoatBot;
 
-const fontUrl = "https://raw.githubusercontent.com/Azadwebapi/Azadx69x-bm-store/main/font.json";
-const categoryUrl = "https://raw.githubusercontent.com/Azadwebapi/Azadx69x-bm-store/main/category.json";
+// API Font + Catégories différentes
+const FONT_API = "https://raw.githubusercontent.com/Azadwebapi/Azadx69x-bm-store/main/font.json";
+const CAT_API = "https://raw.githubusercontent.com/Azadwebapi/Azadx69x-bm-store/main/category.json";
 
-let fontMap = {};
-let categoryMap = {};
-let isLoading = false;
+let fontCache = {};
+let catCache = {};
+let loading = false;
 
-async function loadFont() {
+async function loadFonts() {
   try {
-    const res = await axios.get(fontUrl, { timeout: 5000 });
-    fontMap = res.data || {};
-  } catch (err) {
-    console.error("❌ Font load failed:", err.message);
-  }
+    const res = await axios.get(FONT_API, { timeout: 4000 });
+    fontCache = res.data || {};
+  } catch { fontCache = {}; }
 }
 
-async function loadCategory() {
-  if (isLoading) return;
-  isLoading = true;
-
+async function loadCats() {
+  if (loading) return;
+  loading = true;
   try {
-    const res = await axios.get(categoryUrl, { timeout: 5000 });
-    const rawData = res.data || {};
-    categoryMap = {};
-
-    Object.keys(rawData).forEach(key => {
-      categoryMap[key.toLowerCase().trim()] = rawData[key];
+    const res = await axios.get(CAT_API, { timeout: 4000 });
+    catCache = {};
+    Object.keys(res.data || {}).forEach(k => {
+      catCache[k.toLowerCase().trim()] = res.data[k];
     });
-
-    console.log("✅ Categories loaded:", Object.keys(categoryMap).length);
-  } catch (err) {
-    console.error("❌ Category load failed:", err.message);
-    categoryMap = {};
-  } finally {
-    isLoading = false;
-  }
+  } catch { catCache = {}; }
+  finally { loading = false; }
 }
 
-function toBold(text) {
+function bold(text) {
   if (!text) return "";
-  return text.split("").map(ch => fontMap[ch] || ch).join("");
+  return text.split("").map(ch => fontCache[ch] || ch).join("");
 }
 
-function getCategoryEmoji(category) {
-  if (Object.keys(categoryMap).length === 0 && !isLoading) {
-    loadCategory();
-  }
-
-  const cat = (category || "").toLowerCase().trim();
-  return categoryMap[cat] || "📁";
+function catIcon(cat) {
+  if (!Object.keys(catCache).length &&!loading) loadCats();
+  return catCache[(cat || "").toLowerCase().trim()] || "⚡";
 }
 
 module.exports = {
   config: {
     name: "help",
-    version: "0.0.7",
-    author: "Azadx69x",
+    aliases: ["menu", "cmds", "rayd"],
+    version: "8.0",
+    author: "Rayd Efoua",
     role: 0,
-    countDown: 5,
-    description: { 
-      en: "📚 Show command list or command details" 
-    },
-    category: "Info",
-    guide: {
-      en: "{pn} [command_name]"
-    }
+    countDown: 3,
+    description: { en: "Rayd Efoua Command Center" },
+    category: "system",
+    guide: { en: "{pn} ou {pn} <nom_cmd>" }
   },
 
   onStart: async function ({ message, args, event, role }) {
-    if (Object.keys(fontMap).length === 0) await loadFont();
-    if (Object.keys(categoryMap).length === 0) await loadCategory();
+    if (!Object.keys(fontCache).length) await loadFonts();
+    if (!Object.keys(catCache).length) await loadCats();
 
     const prefix = getPrefix(event.threadID);
     const input = args[0]?.toLowerCase();
-
-    let cmd = null;
+    let targetCmd = null;
 
     if (input) {
-      if (commands.has(input)) {
-        cmd = commands.get(input);
-      } else if (aliases.has(input)) {
-        cmd = commands.get(aliases.get(input));
-      } else {
-        return message.reply(
-`❌ 𝗡𝗢𝗧 𝗙𝗢𝗨𝗡𝗗
-🔍 𝗖𝗼𝗺𝗺𝗮𝗻𝗱: "${input}"`
-        );
-      }
+      if (commands.has(input)) targetCmd = commands.get(input);
+      else if (aliases.has(input)) targetCmd = commands.get(aliases.get(input));
+      else return message.reply(`◈ 𝗘𝗥𝗘𝗨𝗥 404 ◈\n▸ Commande "${input}" introuvable`);
     }
 
-    if (cmd) {
-      const cfg = cmd.config;
-      const desc = typeof cfg.description === "string" ? cfg.description : cfg.description?.en || "❌ 𝗡𝗼 𝗱𝗲𝘀𝗰𝗿𝗶𝗽𝘁𝗶𝗼𝗻";
-      const usage = typeof cfg.guide?.en === "string" ? 
-        cfg.guide.en.replace(/\{pn\}/g, prefix + cfg.name) : 
-        `${prefix}${cfg.name}`;
+    // Détails d'une commande
+    if (targetCmd) {
+      const c = targetCmd.config;
+      const desc = typeof c.description === "string"? c.description : c.description?.en || "Aucune description";
+      const usage = typeof c.guide?.en === "string"? c.guide.en.replace(/{pn}/g, prefix + c.name) : `${prefix}${c.name}`;
+      const aliasList = c.aliases?.length? c.aliases.map(a => prefix + a).join(", ") : "Aucun";
 
-      const aliasesList = cfg.aliases ? 
-        cfg.aliases.map(a => `${prefix}${a}`).join(", ") : 
-        "❌ 𝗡𝗼𝗻𝗲";
+      const detailMsg =
+`◈═══════════════◈
+    𝗥𝗔𝗬𝗗 𝗖𝗘𝗡𝗧𝗘𝗥 𝗩𝟴
+◈═══════════════◈
 
-      const helpMessage = `┍━━━[ 📚 ${toBold("X69X HELP")} ]━━━◊
-┋➥ 📛 ${toBold("Name")}: ${prefix}${cfg.name}
-┋➥ 🗂️ ${toBold("Category")}: ${getCategoryEmoji(cfg.category)} ${cfg.category || "❌ 𝗨𝗻𝗰𝗮𝘁𝗲𝗴𝗼𝗿𝗶𝘇𝗲𝗱"}
-┋➥ 📄 ${toBold("Description")}: ${desc}
-┋➥ ⚙️ ${toBold("Version")}: ${cfg.version || "1.0"}
-┋➥ ⏳ ${toBold("Cooldown")}: ${cfg.countDown || 1}s
-┋➥ 🔒 ${toBold("Role")}: ${cfg.role === 0 ? "👤 𝗔𝗹𝗹" : cfg.role === 1 ? "👑 𝗔𝗱𝗺𝗶𝗻" : "⚡ 𝗢𝘄𝗻𝗲𝗿"}
-┋➥ 👑 ${toBold("Author")}: ${cfg.author || "❌ 𝗨𝗻𝗸𝗻𝗼𝘄𝗻"}
-┋➥ 🔤 ${toBold("Aliases")}: ${aliasesList}
-┍━━━[ 📘 ${toBold("USAGE")} ]━━━◊
-${usage.split('\n').map(line => `┋➥ ${line}`).join('\n')}
-┍━━━[ 💡 ${toBold("NOTES")} ]━━━◊
-┋➥ <text> = Replaceable content
-┋➥ [a|b] = Choose option a or b
-┋➥ ( ) = Optional parameter
-┋➥ {pn} = Bot prefix
-┕━━━━━━━━━━━━━━━━◊`;
+◆ 𝗡𝗢𝗠: ${prefix}${c.name}
+◆ 𝗜𝗖𝗢𝗡𝗘: ${catIcon(c.category)} ${c.category || "Divers"}
+◆ 𝗙𝗢𝗡𝗖𝗧𝗜𝗢𝗡: ${desc}
+◆ 𝗩𝗘𝗥𝗦𝗜𝗢𝗡: v${c.version || "1.0"}
+◆ 𝗔𝗖𝗘𝗦: ${c.role === 0? "👤 Public" : c.role === 1? "👑 Admin" : "⚡ Owner"}
+◆ 𝗗𝗘𝗟𝗔𝗜: ${c.countDown || 3}s
+◆ 𝗔𝗟𝗜𝗔𝗦: ${aliasList}
+◆ 𝗖𝗥𝗘𝗔𝗧𝗘𝗨𝗥: ${c.author || "Rayd Efoua"}
+
+◈═══ 𝗨𝗧𝗜𝗟𝗜𝗦𝗔𝗧𝗜𝗢𝗡 ═══◈
+${usage}
+
+◈═══════ 𝗡𝗢𝗧𝗘 ═══════◈
+▸ <texte> = Paramètre requis
+▸ [a|b] = Choix multiple
+▸ ( ) = Optionnel
+◈══════════◈
+💎 𝗣𝗼𝘄𝗲𝗿𝗲𝗱 𝗯𝘆 𝗥𝗮𝘆𝗱 𝗘𝗳𝗼𝘂𝗮 𝗔𝗜`;
 
       try {
-        await message.reply({
-          body: helpMessage,
-          attachment: await global.utils.getStreamFromURL("https://i.ibb.co/5X9T2dDN/image0.gif")
+        return message.reply({
+          body: detailMsg,
+          attachment: await global.utils.getStreamFromURL("https://i.imgur.com/7yUvePI.gif")
         });
-      } catch (error) {
-        console.log("GIF attachment failed, sending text only:", error);
-        await message.reply(helpMessage);
+      } catch {
+        return message.reply(detailMsg);
       }
-      return;
     }
 
-    const categories = {};
-    for (const [, c] of commands) {
-      if (c.config.role > role) continue;
-      const cat = c.config.category || "Uncategorized";
-      if (!categories[cat]) categories[cat] = [];
-      categories[cat].push(c.config.name);
+    // Menu principal
+    const grouped = {};
+    for (const [name, cmd] of commands) {
+      if (cmd.config.role > role) continue;
+      const cat = cmd.config.category || "Autres";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(name);
     }
 
-    let msg = `┍━━━[ 📚 ${toBold("X69X MENU")} ]━━━◊\n`;
+    let mainMsg = `◈══════════◈
+║ 𝗥𝗔𝗬𝗗 𝗘𝗙𝗢𝗨𝗔 𝗛𝗨𝗕
+║ V8.0 | ${commands.size} Commandes
+◈══════════◈
 
-    const sortedCategories = Object.keys(categories).sort();
+▸ 𝗣𝗿𝗲́𝗳𝗶𝘅𝗲: [ ${prefix} ]
+▸ 𝗨𝘀𝗮𝗴𝗲: ${prefix}help <nom> pour détails
+▸ 𝗦𝘁𝗮𝘁𝘂𝘀: 🟢 En ligne
 
-    for (const cat of sortedCategories) {
-      const categoryName = toBold(cat.toUpperCase());
-      const commandsList = categories[cat].sort();
-      const emoji = getCategoryEmoji(cat);
+`;
 
-      msg += `┍━━━[ ${emoji} ${categoryName} ]━━━◊\n`;
+    Object.keys(grouped).sort().forEach(cat => {
+      const icon = catIcon(cat);
+      const catBold = bold(cat.toUpperCase());
+      const cmds = grouped[cat].sort();
 
-      for (let i = 0; i < commandsList.length; i += 2) {
-        const cmd1 = commandsList[i];
-        const cmd2 = commandsList[i + 1];
+      mainMsg += `◈─── ${icon} ${catBold} ───◈\n`;
 
-        const line = cmd2 ? 
-          `┋➥ ${cmd1.padEnd(15)} ${cmd2}` :
-          `┋➥ ${cmd1}`;
-
-        msg += line + "\n";
+      // 3 commandes par ligne pour compacité
+      for (let i = 0; i < cmds.length; i += 3) {
+        const line = cmds.slice(i, i + 3).map(c => c.padEnd(12)).join(" ");
+        mainMsg += `▸ ${line}\n`;
       }
+      mainMsg += `\n`;
+    });
 
-      msg += "┕━━━━━━━━━━━━━━━━━◊\n";
-    }
-
-    msg += `┍━━━[ 🚀 ${toBold("INFO")} ]━━━◊
-┋➥ ${toBold("Welcome to X69X Bot!")}
-┋➥ ${toBold("Prefix")}: [ ${prefix} ]
-┋➥ ${toBold("Developer")}: Azadx69x
-┋➥ ${toBold("Use")}: ${prefix}help <command>
-┕━━━━━━━━━━━━━━━━◊`;
+    mainMsg += `◈══════════◈
+▸ 💎 Bot développé par Rayd Efoua
+▸ ⚡ Tous droits réservés 2026
+◈══════════◈`;
 
     try {
       await message.reply({
-        body: msg,
-        attachment: await global.utils.getStreamFromURL("https://i.ibb.co/5X9T2dDN/image0.gif")
+        body: mainMsg,
+        attachment: await global.utils.getStreamFromURL("https://i.imgur.com/7yUvePI.gif")
       });
-    } catch (error) {
-      console.log("GIF attachment failed, sending text only:", error);
-      await message.reply(msg);
+    } catch {
+      await message.reply(mainMsg);
     }
   }
 };

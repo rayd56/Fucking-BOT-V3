@@ -1,7 +1,6 @@
 const { createCanvas } = require('canvas');
 const fs = require('fs-extra');
 const path = require('path');
-const { config } = global.GoatBot;
 
 function hexToRgba(hex, alpha) {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -152,10 +151,10 @@ module.exports = {
   config: {
     name: "prefix",
     aliases: ["prefixe", "pre"],
-    version: "2.1.2",
+    version: "2.1.3",
     author: "Rayd",
     countDown: 5,
-    role: 0, // <-- 0 = tout le monde
+    role: 0, // Public pour tout le monde
     shortDescription: { en: "Show bot prefix" },
     longDescription: { en: "Displays global and chat prefix" },
     category: "info",
@@ -163,25 +162,30 @@ module.exports = {
   },
 
   onStart: async function ({ message, event, threadsData, usersData }) {
-    const globalPrefix = config.prefix || "•";
+    // Récupération sécurisée du préfixe global
+    const globalPrefix = global.GoatBot?.config?.prefix || "•";
     let threadPrefix = globalPrefix;
     let senderName = "Utilisateur";
     let imagePath = null;
     
-    // Récup prefix du groupe - avec try/catch pour éviter crash si pas admin
+    // Récupération sécurisée du préfixe du groupe
     try {
         if (threadsData && event.threadID) {
             const threadData = await threadsData.get(event.threadID);
             threadPrefix = threadData?.data?.prefix || globalPrefix;
         }
-    } catch {}
+    } catch (e) {
+        console.log("Erreur threadsData ignorée pour compatibilité publique.");
+    }
 
-    // Récup nom user
+    // Récupération sécurisée du nom de l'utilisateur
     try {
         if (usersData && event.senderID) {
             senderName = await usersData.getName(event.senderID) || "Utilisateur";
         }
-    } catch {}
+    } catch (e) {
+        console.log("Erreur usersData ignorée pour compatibilité publique.");
+    }
 
     try {
         imagePath = await generatePrefixCanvas(globalPrefix, threadPrefix, senderName);
@@ -191,11 +195,11 @@ module.exports = {
           attachment: fs.createReadStream(imagePath)
         });
     } catch (error) {
-        console.error("Erreur canvas:", error);
+        console.error("Erreur de génération d'image, envoi du texte seul :", error);
         return message.reply(`⚙️ **PREFIX**\nGlobal: ${globalPrefix}\nCe chat: ${threadPrefix}`);
     } finally {
         if (imagePath && fs.existsSync(imagePath)) {
-            try { await fs.unlink(imagePath); } catch {}
+            try { await fs.unlink(imagePath); } catch (e) {}
         }
     }
   }

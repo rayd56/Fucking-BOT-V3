@@ -1,114 +1,211 @@
-const fs = require("fs-extra");
-const { utils } = global;
+const { createCanvas } = require('canvas');
+const fs = require('fs-extra');
+const path = require('path');
+const { config } = global.GoatBot;
 
+function fancyText(text) {
+  return global.utils?.toGlobalFontStyle ? global.utils.toGlobalFontStyle(text) : text;
+}
+
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// --- FONCTION DE GÉNÉRATION DE CANVAS DYNAMIQUE CYBERPUNK ---
+async function generatePrefixCanvas(globalPrefix, threadPrefix, senderName) {
+    const width = 850;
+    const height = 350; 
+    const cardX = 35;
+    const cardY = 35;
+    const cardW = width - 70;
+    const cardH = height - 70;
+
+    const canvas = createCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+
+    const theme = {
+        bg: "#060913",
+        card: "rgba(13, 21, 39, 0.85)",
+        accent: "#00f0ff", // Bleu électrique
+        accent2: "#ff0055", // Rose Cyber
+        text: "#ffffff"
+    };
+
+    // 1. Fond Cyberpunk dégradé radial
+    const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 100, width / 2, height / 2, width);
+    bgGrad.addColorStop(0, "#111930");
+    bgGrad.addColorStop(1, theme.bg);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Effet Scanlines d'arrière-plan
+    ctx.globalAlpha = 0.06;
+    for(let i = 0; i < height; i += 2) {
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(0, i, width, 1);
+    }
+    ctx.globalAlpha = 1;
+
+    // Halos néon composites
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    const glow = ctx.createRadialGradient(width, 0, 0, width, 0, 300);
+    glow.addColorStop(0, hexToRgba(theme.accent2, 0.35));
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(width - 300, 0, 300, height);
+    ctx.restore();
+
+    // 2. Card principale en Glassmorphism
+    ctx.save();
+    ctx.shadowColor = theme.accent;
+    ctx.shadowBlur = 25;
+    ctx.fillStyle = theme.card;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+
+    // Bordure dégradée néon
+    const borderGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
+    borderGrad.addColorStop(0, theme.accent);
+    borderGrad.addColorStop(1, theme.accent2);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Reflection supérieure
+    const reflect = ctx.createLinearGradient(cardX, cardY, cardX, cardY + 40);
+    reflect.addColorStop(0, "rgba(255,255,255,0.12)");
+    reflect.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = reflect;
+    ctx.fillRect(cardX, cardY, cardW, 40);
+
+    // 3. Message d'accueil personnalisé demandé
+    ctx.font = "bold 20px sans-serif";
+    ctx.fillStyle = theme.text;
+    ctx.shadowColor = theme.accent;
+    ctx.shadowBlur = 10;
+    ctx.fillText(`Hey ${senderName}, tu as demandé mon prefix`, cardX + 30, cardY + 45);
+    ctx.shadowBlur = 0;
+
+    ctx.font = "12px monospace";
+    ctx.fillStyle = hexToRgba(theme.text, 0.5);
+    ctx.fillText("SYSTEM CONFIGURATION PROTOCOL v2.1", cardX + 30, cardY + 70);
+
+    // Ligne séparatrice
+    const lineGrad = ctx.createLinearGradient(cardX + 30, 0, cardX + cardW - 30, 0);
+    lineGrad.addColorStop(0, theme.accent);
+    lineGrad.addColorStop(1, "transparent");
+    ctx.strokeStyle = lineGrad;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(cardX + 30, cardY + 85);
+    ctx.lineTo(cardX + cardW - 30, cardY + 85);
+    ctx.stroke();
+
+    // 4. Blocs de Données Dynamiques (Global vs Local)
+    const boxWidth = (cardW - 80) / 2;
+    const boxHeight = 95;
+    const boxY = cardY + 110;
+
+    // --- BLOC GLOBAL ---
+    const box1X = cardX + 30;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+    ctx.beginPath();
+    ctx.roundRect(box1X, boxY, boxWidth, boxHeight, 10);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.stroke();
+
+    // Indicateur visuel bleu
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(box1X, boxY + 20, 4, boxHeight - 40);
+
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = hexToRgba(theme.text, 0.4);
+    ctx.fillText("GLOBAL SYSTEM PREFIX", box1X + 20, boxY + 32);
+    
+    ctx.font = "bold 36px monospace";
+    ctx.fillStyle = theme.text;
+    ctx.fillText(globalPrefix, box1X + 20, boxY + 75);
+
+    // --- BLOC THIS CHAT ---
+    const box2X = box1X + boxWidth + 20;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+    ctx.beginPath();
+    ctx.roundRect(box2X, boxY, boxWidth, boxHeight, 10);
+    ctx.fill();
+    ctx.stroke();
+
+    // Indicateur visuel rose
+    ctx.fillStyle = theme.accent2;
+    ctx.fillRect(box2X, boxY + 20, 4, boxHeight - 40);
+
+    ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = hexToRgba(theme.text, 0.4);
+    ctx.fillText("CURRENT CHAT PREFIX", box2X + 20, boxY + 32);
+    
+    ctx.font = "bold 36px monospace";
+    ctx.fillStyle = theme.accent2; 
+    ctx.fillText(threadPrefix, box2X + 20, boxY + 75);
+
+    // 5. Bas de page / Footer Hologramme
+    ctx.textAlign = "center";
+    ctx.font = "10px monospace";
+    ctx.fillStyle = hexToRgba(theme.text, 0.3);
+    ctx.fillText(`SECURE PROTOCOL TRANSMISSION • RAYD SYSTEMS GROUP`, width / 2, height - 50);
+
+    // Enregistrement final dans le cache
+    const dirCache = global.client.dirCache || path.join(__dirname, "cache");
+    await fs.ensureDir(dirCache);
+    const imagePath = path.join(dirCache, `prefix_cyber_${Date.now()}.png`);
+    await fs.promises.writeFile(imagePath, canvas.toBuffer('image/png'));
+    return imagePath;
+}
+
+// --- MODULE PRINCIPAL ---
 module.exports = {
   config: {
     name: "prefix",
-    version: "0.0.7",
-    author: "Azadx69x",
+    aliases: ["prefixe"],
+    version: "2.1.0",
+    author: "rayd",
     countDown: 5,
     role: 0,
-    shortDescription: "Prefix manager",
-    longDescription: "Control bot prefix (chat/global)",
-    category: "system"
+    shortDescription: { en: "Show bot prefix in a cyberpunk neon UI" },
+    longDescription: { en: "Displays the global and current chat prefix inside an advanced dynamic neon grid canvas with user greetings." },
+    category: "info",
+    guide: { en: "{pn}" }
   },
 
-  langs: {
-    en: {
-      askPrefix: "😏 𝐇𝐞𝐲 %name%, 𝐝𝐢𝐝 𝐲𝐨𝐮 𝐚𝐬𝐤 𝐟𝐨𝐫 𝐦𝐲 𝐩𝐫𝐞𝐟𝐢𝐱?\n❯🌐 𝐆𝐥𝐨𝐛𝐚𝐥 ⟿『%global%』\n❯💬 𝐂𝐡𝐚𝐭 ⟿ 『%chat%』\n\n🤖 𝐈'𝐦 𝐗69𝐗 𝐁𝐎𝐓 𝐕3 𝐚𝐭 𝐲𝐨𝐮𝐫 𝐬𝐞𝐫𝐯𝐢𝐜𝐞 👿",
-      resetPrefix: "☢️ 𝐏𝐫𝐞𝐟𝐢𝐱 𝐑𝐞𝐬𝐞𝐭\n\n🌐 𝐆𝐥𝐨𝐛𝐚𝐥 ⟿ %global%\n💬 𝐂𝐡𝐚𝐭 ⟿ %global%\n\n🤖 𝐗69𝐗 𝐁𝐎𝐓 𝐕3",
-      confirmChange: "♻️ %type% 𝐂𝐡𝐚𝐧𝐠𝐞\n%old% ⇢ %new%\n\n👆 𝐑𝐞𝐚𝐜𝐭 𝐰𝐢𝐭𝐡 ✅ 𝐭𝐨 𝐜𝐨𝐧𝐟𝐢𝐫𝐦",
-      updatedGlobal: "✅ 𝐆𝐥𝐨𝐛𝐚𝐥 𝐔𝐩𝐝𝐚𝐭𝐞 ⇢ %prefix%\n\n🤖 𝐗69𝐗 𝐁𝐎𝐓 𝐕3",
-      updatedChat: "✅ 𝐂𝐡𝐚𝐭 𝐔𝐩𝐝𝐚𝐭𝐞 ⇢ %prefix%\n\n🤖 𝐗69𝐗 𝐁𝐎𝐓 𝐕3",
-      ownerOnly: "⛔ 𝐎𝐰𝐧𝐞𝐫 𝐎𝐧𝐥𝐲",
-      cancelled: "❌ 𝐂𝐚𝐧𝐜𝐞𝐥𝐥𝐞𝐝"
-    }
-  },
-
-  onStart: async function ({ api, event, args, threadsData, getLang }) {
-    const { threadID, messageID, senderID } = event;
-
-    let name = "User";
+  onStart: async function ({ message, event, threadsData, usersData }) {
+    const globalPrefix = config.prefix || "•";
+    let threadPrefix = globalPrefix;
+    let senderName = "Utilisateur";
+    
     try {
-      const data = await api.getUserInfo(senderID);
-      name = data[senderID]?.name?.split(" ")[0] || "User";
-    } catch {}
+        const threadData = await threadsData.get(event.threadID);
+        if (threadData && threadData.data && threadData.data.prefix) {
+            threadPrefix = threadData.data.prefix;
+        }
+    } catch (e) {}
 
-    const globalPf = global.GoatBot.config.prefix;
-    const threadPf = await threadsData.get(threadID, "data.prefix").catch(() => null);
-    const currentPf = threadPf || globalPf;
+    try {
+        senderName = await usersData.getName(event.senderID) || "Utilisateur";
+    } catch (e) {}
 
-    if (!args[0]) {
-      return api.sendMessage(
-        getLang("askPrefix").replace("%name%", name).replace("%global%", globalPf).replace("%chat%", currentPf),
-        threadID,
-        messageID
-      );
-    }
-
-    if (args[0].toLowerCase() === "reset") {
-      await threadsData.set(threadID, null, "data.prefix");
-      return api.sendMessage(
-        getLang("resetPrefix").replace(/%global%/g, globalPf),
-        threadID,
-        messageID
-      );
-    }
-
-    const nextPf = args[0];
-    const isGlobal = args[1] === "-g";
-
-    if (isGlobal && senderID !== api.getCurrentUserID()) {
-      return api.sendMessage(getLang("ownerOnly"), threadID, messageID);
-    }
-
-    const confirmText = isGlobal
-      ? getLang("confirmChange").replace("%type%", "Global").replace("%old%", globalPf).replace("%new%", nextPf)
-      : getLang("confirmChange").replace("%type%", "Chat").replace("%old%", currentPf).replace("%new%", nextPf);
-
-    return api.sendMessage(confirmText, threadID, (err, info) => {
-      if (err) return;
-
-      global.GoatBot.onReaction.set(info.messageID, {
-        messageID: info.messageID,
-        commandName: "prefix",
-        uid: senderID,
-        prefix: nextPf,
-        isGlobal: isGlobal,
-        threadID: threadID
-      });
-    }, messageID);
-  },
-
-  onReaction: async function ({ api, event, Reaction, threadsData, getLang }) {
-    const { userID, messageID, reaction, threadID } = event;
-
-    if (!Reaction || Reaction.uid !== userID) return;
-
-    const normalizedReaction = reaction ? reaction.toString().replace(/\uFE0F/g, '').trim() : '';
-    const targetEmoji = "✅";
-
-    const isConfirm = normalizedReaction === targetEmoji ||
-                      normalizedReaction === "✓" ||
-                      normalizedReaction === "☑" ||
-                      normalizedReaction === "✔";
-
-    if (!isConfirm) {
-      global.GoatBot.onReaction.delete(messageID);
-      return api.sendMessage(getLang("cancelled"), Reaction.threadID, messageID);
-    }
-
-    const { prefix, isGlobal } = Reaction;
-
-    global.GoatBot.onReaction.delete(messageID);
-
-    if (isGlobal) {
-      global.GoatBot.config.prefix = prefix;
-      await fs.writeFile(global.client.dirConfig, JSON.stringify(global.GoatBot.config, null, 2));
-      return api.sendMessage(getLang("updatedGlobal").replace("%prefix%", prefix), threadID);
-    }
-
-    await threadsData.set(threadID, prefix, "data.prefix");
-    return api.sendMessage(getLang("updatedChat").replace("%prefix%", prefix), threadID);
+    const imagePath = await generatePrefixCanvas(globalPrefix, threadPrefix, senderName);
+    
+    await message.reply({
+      body: fancyText(`⚙️ **PREFIX CONFIGURATION**\n\nGlobal : ${globalPrefix}\nThis chat : ${threadPrefix}`),
+      attachment: fs.createReadStream(imagePath)
+    });
+    
+    return await fs.unlink(imagePath);
   }
 };

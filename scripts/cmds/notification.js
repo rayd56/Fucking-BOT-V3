@@ -1,208 +1,206 @@
-const { createCanvas } = require('canvas');
-const fs = require('fs-extra');
-const path = require('path');
-const { config } = global.GoatBot;
+const fs = require("fs-extra");
+const path = require("path");
+const { createCanvas, registerFont } = require("canvas");
 
-function fancyText(text) {
-  return global.utils?.toGlobalFontStyle ? global.utils.toGlobalFontStyle(text) : text;
-}
+// Fonts
+try {
+  registerFont(path.join(__dirname, "fonts/Rajdhani-Bold.ttf"), { family: "Rajdhani" });
+  registerFont(path.join(__dirname, "fonts/Teko-SemiBold.ttf"), { family: "Teko" });
+  registerFont(path.join(__dirname, "fonts/Orbitron-Black.ttf"), { family: "Orbitron" });
+} catch {}
 
-// --- FONCTION DE GÉNÉRATION DE CANVAS STYLE LUXURY DIFFUSION ---
-async function generateNotiCanvas(adminName, messageContent, totalGroups) {
-    const width = 1000; 
-    const height = 450; 
-    const padding = 65;
+async function generateNotificationCanvas(adminName, messageText) {
+  const width = 1000;
+  const height = 560;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext("2d");
 
-    const canvas = createCanvas(width, height);
-    const ctx = canvas.getContext('2d');
+  // BLUE GRADIENT BACKGROUND
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, "#0a192f");
+  bgGrad.addColorStop(0.5, "#112240");
+  bgGrad.addColorStop(1, "#1e3a8a");
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
 
-    // 1. Fond Minimaliste Luxury
-    const gradient = ctx.createRadialGradient(width / 2, height / 2, 50, width / 2, height / 2, width * 0.6);
-    gradient.addColorStop(0, '#121214');
-    gradient.addColorStop(1, '#080809');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
-
-    // 2. Bordure Fine Or Satiné
-    const goldGrad = ctx.createLinearGradient(0, 0, width, height);
-    goldGrad.addColorStop(0, '#d4af37');
-    goldGrad.addColorStop(0.5, '#f3e5ab');
-    goldGrad.addColorStop(1, '#aa7c11');
-    
-    ctx.strokeStyle = goldGrad;
-    ctx.lineWidth = 1.5; 
-    ctx.strokeRect(25, 25, width - 50, height - 50);
-
-    // 3. En-tête Épuré
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '300 24px sans-serif'; 
-    ctx.fillText("COMMUNIQUE OFFICIEL", padding, 85);
-
-    ctx.fillStyle = '#d4af37'; 
-    ctx.font = '600 13px monospace'; 
-    ctx.letterSpacing = "2px"; 
-    ctx.fillText(`EMIS PAR : ${adminName.toUpperCase()}  •  CANAL : ${totalGroups} DIRECTS`, padding, 115);
-
-    // Ligne de séparation
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
-    ctx.lineWidth = 1;
+  // Lignes diagonales
+  ctx.strokeStyle = "rgba(59, 130, 246, 0.15)";
+  ctx.lineWidth = 2;
+  for(let i = -height; i < width; i += 60) {
     ctx.beginPath();
-    ctx.moveTo(padding, 135);
-    ctx.lineTo(width - padding, 135);
+    ctx.moveTo(i, 0);
+    ctx.lineTo(i + height, height);
     ctx.stroke();
+  }
 
-    // 4. Zone d'affichage du message
-    const boxY = 175;
-    const boxW = width - (padding * 2);
-    const boxH = 180;
+  // Glow bleu
+  const glow = ctx.createRadialGradient(width/2, height/2, 0, width/2, height/2, 350);
+  glow.addColorStop(0, "rgba(59, 130, 246, 0.3)");
+  glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, width, height);
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.01)';
-    ctx.beginPath();
-    ctx.roundRect(padding, boxY, boxW, boxH, 8);
-    ctx.fill();
+  // PANNEAU
+  const panelW = 900, panelH = 420;
+  const panelX = (width - panelW) / 2, panelY = 70;
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 36px sans-serif'; 
-    
-    const words = messageContent.split(' ');
-    let line = '';
-    let y = boxY + 70;
-    const maxLineWidth = boxW - 40;
+  ctx.fillStyle = "rgba(17, 34, 64, 0.92)";
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, 30);
+  ctx.fill();
 
-    for (let n = 0; n < words.length; n++) {
-        let testLine = line + words[n] + ' ';
-        let metrics = ctx.measureText(testLine);
-        if (metrics.width > maxLineWidth && n > 0) {
-            ctx.fillText(line, padding + 20, y);
-            line = words[n] + ' ';
-            y += 50; 
-        } else {
-            line = testLine;
-        }
+  ctx.strokeStyle = "#3b82f6";
+  ctx.lineWidth = 3;
+  ctx.shadowColor = "#3b82f6";
+  ctx.shadowBlur = 25;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // BADGE ADMIN
+  ctx.fillStyle = "rgba(59, 130, 246, 0.25)";
+  ctx.beginPath();
+  ctx.roundRect(panelX + 30, panelY - 20, 200, 40, 20);
+  ctx.fill();
+  ctx.strokeStyle = "#3b82f6";
+  ctx.stroke();
+
+  ctx.font = "bold 16px Rajdhani, Arial";
+  ctx.fillStyle = "#3b82f6";
+  ctx.textAlign = "center";
+  ctx.fillText("⚡ ADMIN PREMIUM ⚡", panelX + 130, panelY + 5);
+
+  // HEADER
+  ctx.font = "bold 42px Orbitron, Rajdhani, Arial";
+  ctx.fillStyle = "#60a5fa";
+  ctx.shadowColor = "#3b82f6";
+  ctx.shadowBlur = 20;
+  ctx.fillText("📢 NOTIFICATION OFFICIELLE", width / 2, panelY + 65);
+  ctx.shadowBlur = 0;
+
+  ctx.strokeStyle = "#3b82f6";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(panelX + 50, panelY + 95);
+  ctx.lineTo(panelX + panelW - 50, panelY + 95);
+  ctx.stroke();
+
+  // ADMIN + MESSAGE
+  ctx.textAlign = "left";
+  ctx.font = "bold 22px Teko, Arial";
+  ctx.fillStyle = "#60a5fa";
+  ctx.fillText("👤 Admin :", panelX + 50, panelY + 145);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillText(adminName, panelX + 180, panelY + 145);
+
+  ctx.font = "bold 25px Rajdhani, Arial";
+  ctx.fillStyle = "#93c5fd";
+  ctx.fillText("💬 Message :", panelX + 50, panelY + 195);
+
+  ctx.fillStyle = "rgba(59, 130, 246, 0.12)";
+  ctx.beginPath();
+  ctx.roundRect(panelX + 40, panelY + 215, panelW - 80, 160, 15);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(96, 165, 250, 0.4)";
+  ctx.stroke();
+
+  ctx.font = "19px Teko, Arial";
+  ctx.fillStyle = "#e2e8f0";
+  const words = messageText.split(' ');
+  let line = '', y = panelY + 245;
+  const maxWidth = panelW - 120;
+
+  for(let n = 0; n < words.length; n++) {
+    const testLine = line + words[n] + ' ';
+    if (ctx.measureText(testLine).width > maxWidth && n > 0) {
+      ctx.fillText(line, panelX + 60, y);
+      line = words[n] + ' ';
+      y += 32;
+    } else {
+      line = testLine;
     }
-    ctx.fillText(line, padding + 20, y);
+  }
+  ctx.fillText(line, panelX + 60, y);
 
-    // 5. Footer Signature Premium
-    ctx.textAlign = 'center';
-    ctx.font = '11px monospace'; 
-    ctx.fillStyle = '#4a4a4e';
-    ctx.fillText(`DISTRIBUTED SECURELY VIA RAYD EXECUTIVE NETWORK`, width / 2, height - 45);
+  ctx.textAlign = "center";
+  ctx.font = "italic 15px Rajdhani, Arial";
+  ctx.fillStyle = "rgba(147, 197, 253, 0.8)";
+  ctx.fillText(`⚡ RAYD EFOUA HUB • ${new Date().toLocaleDateString("fr-FR")} ⚡`, width / 2, height - 25);
 
-    const dirCache = global.client?.dirCache || path.join(__dirname, "cache");
-    await fs.ensureDir(dirCache);
-    const imagePath = path.join(dirCache, `noti_chic_${Date.now()}_${Math.floor(Math.random() * 1000)}.png`);
-    await fs.promises.writeFile(imagePath, canvas.toBuffer('image/png'));
-    return imagePath;
+  const cacheDir = path.join(__dirname, "cache");
+  if (!fs.existsSync(cacheDir)) fs.mkdirSync(cacheDir);
+  const cachePath = path.join(cacheDir, `notif_${Date.now()}.png`);
+  fs.writeFileSync(cachePath, canvas.toBuffer("image/png"));
+
+  return { cachePath, captionText: `📢 NOTIFICATION OFFICIELLE\n👤 Admin: ${adminName}\n💬 Message: ${messageText}\n\n⚡ RAYD EFOUA HUB` };
 }
 
-// --- MODULE PRINCIPAL ---
 module.exports = {
   config: {
-    name: "noti",
-    aliases: ["notification", "broadcast", "bc"],
-    version: "1.1.5",
-    author: "rayd",
-    countDown: 10,
-    role: 2, 
-    shortDescription: { en: "Send a notification luxury image + text to all groups" },
-    longDescription: { en: "Broadcasts an administrative announcement inside a highly customizable professional canvas." },
-    category: "owner",
-    guide: { en: "{pn} [votre message]" }
+    name: "notification",
+    aliases: ["noti"],
+    version: "1.7",
+    author: "Rayd",
+    countDown: 5,
+    role: 2,
+    shortDescription: "Broadcast notification bleu safe",
+    category: "⚙️ Admin"
   },
 
-  onStart: async function ({ message, event, args, usersData, threadsData, api }) {
-    const devArray = config.developer || config.devUsers || config.developers || [];
-    
-    if (!devArray.includes(event.senderID.toString())) {
-      return message.reply(fancyText("✕ Accès refusé : Connexion sécurisée requise."));
-    }
-
-    const content = args.join(" ");
-    if (!content) {
-        return message.reply(fancyText("✨ Veuillez saisir la note à diffuser globalement."));
-    }
-
-    let senderName = "Administrateur";
+  onStart: async function ({ message, event, args, threadsData, usersData, api }) {
     try {
-        if (usersData && event.senderID) {
-            senderName = await usersData.getName(event.senderID) || "Administrateur";
-        }
-    } catch (e) {}
+      const messageText = args.join(" ");
+      if (!messageText) return message.reply("❌ Usage: `.noti ton message ici`");
 
-    // --- STRATÉGIE DE RÉCUPÉRATION COMPLÈTE DES GROUPES ---
-    let allThreadIDs = [];
-    try {
-        // Méthode 1 : Récupération depuis la base de données du bot (le plus fiable sur GoatBot)
-        if (threadsData && typeof threadsData.getAll === 'function') {
-            const allThreadsRaw = await threadsData.getAll() || [];
-            allThreadIDs = allThreadsRaw
-                .filter(t => t && t.threadID && t.isGroup !== false)
-                .map(t => t.threadID.toString());
-        }
-    } catch (e) {
-        console.error("Échec de la récupération via threadsData, tentative via API...", e);
-    }
+      const adminName = await usersData.getName(event.senderID);
+      const { cachePath, captionText } = await generateNotificationCanvas(adminName, messageText);
 
-    // Méthode de secours 2 : Si la BDD est vide, on force l'API Facebook à fouiller l'inbox
-    if (allThreadIDs.length === 0) {
-        try {
-            const inbox = await api.getThreadList(500, null, ["INBOX", "OTHER"]) || [];
-            allThreadIDs = inbox
-                .filter(thread => thread.isGroup === true || thread.isSubscribed === true)
-                .map(thread => thread.threadID.toString());
-        } catch (err) {
-            console.error("Erreur via api.getThreadList:", err);
-        }
-    }
+      const allThreads = await threadsData.getAll();
+      const groupThreads = allThreads.filter(t => t.threadID && t.isGroup);
 
-    // Supprimer les doublons et s'assurer qu'on n'inclut pas des chaînes vides
-    allThreadIDs = [...new Set(allThreadIDs)].filter(id => id && id !== "");
+      await message.reply(`📡 **BROADCAST LANCÉ**\nCible: ${groupThreads.length} groupes\nMode: Batch sécurisé anti-ban...`);
 
-    if (allThreadIDs.length === 0) {
-        return message.reply("❌ Aucun groupe n'a pu être détecté dans la base de données.");
-    }
+      let success = 0, failed = 0;
+      const batchSize = 15; // 15 groupes max par batch pour éviter ban WhatsApp
+      const delay = 3000; // 3s entre chaque batch
 
-    let canvasPath = null;
-    let successCount = 0;
+      // ✅ FIX : Envoi par batch + nouveau stream à chaque fois
+      for(let i = 0; i < groupThreads.length; i += batchSize) {
+        const batch = groupThreads.slice(i, i + batchSize);
 
-    try {
-        canvasPath = await generateNotiCanvas(senderName, content, allThreadIDs.length);
-
-        // Message initial à l'exécuteur
-        await message.reply({
-            body: `⚜️ **Transmission du communiqué en cours...**\nAlignement sur ${allThreadIDs.length} canaux réseau détectés.`,
-            attachment: fs.createReadStream(canvasPath)
-        });
-
-        // Envoi en boucle à TOUS les IDs trouvés
-        for (const threadID of allThreadIDs) {
+        await Promise.all(batch.map(thread =>
+          new Promise(async (resolve) => {
             try {
-                await api.sendMessage({
-                    body: `✨ **COMMUNIQUÉ DE L'ADMINISTRATION**\n\n${content}`,
-                    attachment: fs.createReadStream(canvasPath)
-                }, threadID);
-                successCount++;
-                
-                // Pause de sécurité pour éviter le bannissement Facebook (1.2 seconde)
-                await new Promise(resolve => setTimeout(resolve, 1200));
-            } catch (error) {
-                console.error(`Échec d'envoi pour le thread ${threadID}:`, error.message);
-            }
-        }
-
-        return await message.reply(`✅ **Rapport final disponible**\nTransmissions validées : ${successCount}/${allThreadIDs.length} groupes.`);
-
-    } catch (globalError) {
-        console.error("Erreur critique noti:", globalError);
-        return message.reply(`❌ Erreur technique : ${globalError.message}`);
-    } finally {
-        if (canvasPath && fs.existsSync(canvasPath)) {
-            try {
-                await fs.unlink(canvasPath);
+              await api.sendMessage({
+                body: captionText,
+                attachment: fs.createReadStream(cachePath) // Nouveau stream à chaque envoi
+              }, thread.threadID);
+              success++;
             } catch (err) {
-                console.error("Erreur nettoyage cache:", err);
+              failed++;
+              console.error(`Fail groupe ${thread.threadID}:`, err.message || err);
             }
+            resolve();
+          })
+        ));
+
+        if(i + batchSize < groupThreads.length) {
+          await new Promise(r => setTimeout(r, delay)); // Pause anti-rate-limit
         }
+      }
+
+      if (fs.existsSync(cachePath)) fs.unlinkSync(cachePath);
+
+      return message.reply(
+        `✅ **BROADCAST TERMINÉ**\n\n` +
+        `📢 Message: "${messageText}"\n` +
+        `📊 Réussi: ${success} groupes\n` +
+        `❌ Échec: ${failed} groupes\n` +
+        `⏱️ Durée: ~${Math.ceil(groupThreads.length/batchSize)*3}s`
+      );
+
+    } catch (error) {
+      console.error("Erreur notification:", error);
+      return message.reply("❌ Erreur: " + (error.message || "Inconnue"));
     }
   }
 };
